@@ -97,7 +97,7 @@ def return_fullpars(pars,model,transitions,verbose=False):
         
     return np.array(fullpars)
 
-def get_constraints_npars_ccode(model,direction,fcd=100,fcu=100,tolerance=1e-6):
+def get_constraints_npars(model,direction,fcd=100,fcu=100,tolerance=1e-6):
     #tolerance: to ensure TF always accelerates or decreases
     tol_p1=1+tolerance #a bit above 1
     tol_m1=1-tolerance #a bit below 1
