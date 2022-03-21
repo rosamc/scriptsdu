@@ -101,19 +101,7 @@ def get_constraints_npars_ccode(model,direction,fcd=100,fcu=100,tolerance=1e-6):
     #tolerance: to ensure TF always accelerates or decreases
     tol_p1=1+tolerance #a bit above 1
     tol_m1=1-tolerance #a bit below 1
-    if model=="3_1":
-        ccode=state3_rev1
-    elif model=="3_2":
-        ccode=state3_rev2
-    elif model=="3_12":
-        ccode=state3_rev12
-    elif model=="5_1":
-        ccode=state5_rev1
-    elif model=="5_1234":
-        ccode=state5_rev1234
-    else:
-        print("model not understood")
-        raise(ValueError)
+    
 
     if model=="3_1" or model=="3_2":
         npars=8
