@@ -134,7 +134,7 @@ def get_constraints_npars(model,direction,fcd=100,fcu=100,tolerance=1e-6):
     else:
         print("unrecognised direction, ", direction)
         raise ValueError
-    return [constraints,npars,ccode]
+    return [constraints,npars]
 
 def get_score_up_down(out):
     """monotonics, bell up, bell down (cup)"""
