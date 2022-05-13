@@ -2,7 +2,8 @@ import sys,os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def return_fullpars(pars,model,transitions,verbose=False):
+def return_fullpars_polcycle(pars,model=None,transitions=None,verbose=False):
+    #initially called simply return_fullpars
     #pars shuold be in this order: kb,ku, forward basal parameters, reverse basal parameters, rates the TF changes
     #transitions shuld be [xf, yr]: TF modifies transition x in the forward direction, and y in the reverse. Starts at 1.
     sites,rev=model.split("_")
@@ -98,7 +99,8 @@ def return_fullpars(pars,model,transitions,verbose=False):
         
     return np.array(fullpars)
 
-def get_constraints_npars(model,direction,fcd=100,fcu=100,tolerance=1e-6):
+
+def get_constraints_npars_polcycle(model,direction,fcd=100,fcu=100,tolerance=1e-6):
     #tolerance: to ensure TF always accelerates or decreases
     tol_p1=1+tolerance #a bit above 1
     tol_m1=1-tolerance #a bit below 1
@@ -219,11 +221,18 @@ def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.07
     delta_y=(y1) #if the last value is greater than the first: positive, otherwise: negative.  
     return [delta_x,delta_y]
 
-def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False,log2out=False,n_per_om=4,**kwargs):
-    """kwargs are arguments to be passed to the actual scoring function scoref. It must have a fc_tol parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
+def score(pars,return_fullpars=None,ssfunc=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False,log2out=False,n_per_om=4,**kwargs):
+    """
+    originally, instead of ssfunc, I was using ccode, which had to be a class with a method called interfacess(fullpars,np.array([A])). In order to be able to generalise, now it requires directly a function that takes as argument the parameter set and TF concentration(s) array, and returns the steady state.
+    kwargs are arguments to be passed to the actual scoring function scoref. It must have a fc_tol parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
     tol_A=kwargs["out0_tol"]#to decide Amax and Amin
-    fullpars=return_fullpars(pars,model,transitions)
-    out0=ccode.interfacess(fullpars,np.array([0])) #basal expression, in the absence of TF
+    if return_fullpars is not None:
+        """For the pol-cycle model"""
+        fullpars=return_fullpars(pars)
+    else:
+        fullpars=pars
+
+    out0=ssfunc(fullpars,np.array([0])) #basal expression, in the absence of TF
     score=[]
     if not Amin:
         Amin=1e-3
@@ -231,7 +240,7 @@ def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Am
         Amin_found=False
         i=0
         while ((Amin_found is False) and (i<20)):
-            outA0=ccode.interfacess(fullpars,np.array([Amin]))
+            outA0=ssfunc(fullpars,np.array([Amin]))
             if np.abs(np.log2(outA0/out0))<tol_A:
                 Amin_found=True
                 #print("when Amin is found", np.log2(outA0/out0))
@@ -245,8 +254,8 @@ def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Am
         #print("searching Amax")
         Amax=1e3
         Amax_found=False
-        outinf25=ccode.interfacess(fullpars,np.array([1e25])) #very saturated expression
-        outinf30=ccode.interfacess(fullpars,np.array([1e30])) 
+        outinf25=ssfunc(fullpars,np.array([1e25])) #very saturated expression
+        outinf30=ssfunc(fullpars,np.array([1e30])) 
         if np.abs(np.log2(outinf30/outinf25))>tol_A:
             #print("not saturated at 30:", outinf25, outinf30)
             score=[np.NaN,np.NaN]
@@ -254,7 +263,7 @@ def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Am
         if len(score)==0:
             i=0
             while ((Amax_found is False) and (i<20)):
-                outAm=ccode.interfacess(fullpars,np.array([Amax]))
+                outAm=ssfunc(fullpars,np.array([Amax]))
                 if np.abs(np.log2(outAm/outinf30))<tol_A:
                     Amax_found=True
                 else:
@@ -275,7 +284,7 @@ def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Am
         out=np.zeros(len(Avals))
         for a in range(n):
             A=Avals[a]
-            out[a]=ccode.interfacess(fullpars,np.array([A]))
+            out[a]=ssfunc(fullpars,np.array([A]))
         if not log2out:
             f=out/out0
         else:
