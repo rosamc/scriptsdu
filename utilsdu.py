@@ -65,7 +65,8 @@ def return_fullpars(pars,model,transitions,verbose=False):
         pars_dict["kr_3_0"]=kr_3_0
         pars_dict["kr_4_0"]=kr_4_0
         allparnames="kb,k_1_0,kr_1_0,kb,k_2_0,kr_2_0,kb,k_3_0,kr_3_0,kb,k_4_0,kr_4_0,kb,k_5_0,ku,k_1_1,kr_1_1,ku,k_2_1,kr_2_1,ku,k_3_1,kr_3_1,ku,k_4_1,kr_4_1,ku,k_5_1".split(",")
-    
+    else:
+        raise ValueError("unrecognised model", model)
     labels=[]
     for transition in transitions:
         if "f" in transition:
@@ -162,21 +163,128 @@ def get_score_up_down(out):
     delta_y=(x2-x1)/x1 #if decreasing at x1: negative quantity. If increasing at x1: positive.
     return [delta_x,delta_y]
 
-def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False):
-    
+def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.070389327891398):
+    """out is assumed to be the response, in log2(FC).
+    fc_tol is set to 0.07039 which is log2(1.05/1). If the difference between maximum and minimum of out is less than this, it is essentially flat, so discard."""
+    if check_out0 and out[0]>out0_tol:
+        #print(out[0],"evaluate a smaller TF concentration") 
+        return([np.NaN, np.NaN])
+    if np.abs(np.max(out)-np.min(out))<fc_tol: #if it is essentially flat or the fold change is very small, then inaccuracies start appearing,and also it is not interesting...
+        return([np.NaN,np.NaN])    
+    argmax=np.argmax(out)
+    argmin=np.argmin(out)
+    n=len(out)-1
+    y0=out[0]
+    y1=out[-1]
+    dif=np.diff(out)
+    up=np.where(dif>tol)[0]
+    flat=np.where((dif>-tol)&(dif<tol))[0]
+    down=np.where(dif<-tol)[0]
+    mono_up=False
+    mono_down=False
+    up_down=False
+    down_up=False
+    multi_peak=True
+    if len(down)==0:
+        mono_up=True
+        yc=y1
+    elif len(up)==0:
+        mono_down=True
+        yc=y0
+    elif np.max(up)<np.min(down): #increasing and decreasing: all up are less than all down
+        up_down=True
+        yc=out[argmax]
+    elif np.max(down)<np.min(up): #decreasing and increasing: all down are less than all up
+        down_up=True
+        yc=out[argmin]
+    else:
+        multi_peak=True
+        print(multi_peak)
+        print(",".join(map(str,out)))
+        #mins=argrelmin(out)
+        #maxs=argrelmax(out)
+        #plt.plot(range(len(out)),out)
+        #plt.scatter(mins,out[mins],color="b")
+        #plt.scatter(maxs,out[maxs],color="r")
+        #plt.title("%s,%s"%(0,y1))
+        #plt.show()
+        yc=0
+        
+        
+        
+            
+    delta_x=(yc) #if increasing at x0: positive quantity. If decreasing at x0: negative.
+    delta_y=(y1) #if the last value is greater than the first: positive, otherwise: negative.  
+    return [delta_x,delta_y]
+
+def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False,log2out=False,n_per_om=4,**kwargs):
+    """kwargs are arguments to be passed to the actual scoring function scoref. It must have a tol_A parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
+    tol_A=kwargs["tol_A"]
     fullpars=return_fullpars(pars,model,transitions)
-    Avals=np.logspace(Amin,Amax,n)
-    #print(len(Avals))
     out0=ccode.interfacess(fullpars,np.array([0])) #basal expression, in the absence of TF
-    out=np.zeros(len(Avals))
-    for a in range(n):
-        A=Avals[a]
-        out[a]=ccode.interfacess(fullpars,np.array([A]))
-    score=scoref(out/out0)
+    score=[]
+    if not Amin:
+        Amin=1e-3
+        #first find Amin and Amax such that function starts at 0 and is saturated
+        Amin_found=False
+        i=0
+        while ((Amin_found is False) and (i<20)):
+            outA0=ccode.interfacess(fullpars,np.array([Amin]))
+            if np.abs(np.log2(outA0/out0))<tol_A:
+                Amin_found=True
+                #print("when Amin is found", np.log2(outA0/out0))
+            else:
+                Amin=Amin/10
+                i+=1
+        if not Amin_found:
+            #print("failed to get Amin",out0, outA0)
+            score=[np.NaN,np.NaN]
+    if not Amax:
+        #print("searching Amax")
+        Amax=1e3
+        Amax_found=False
+        outinf25=ccode.interfacess(fullpars,np.array([1e25])) #very saturated expression
+        outinf30=ccode.interfacess(fullpars,np.array([1e30])) 
+        if np.abs(np.log2(outinf30/outinf25))>tol_A:
+            #print("not saturated at 30:", outinf25, outinf30)
+            score=[np.NaN,np.NaN]
+        
+        if len(score)==0:
+            i=0
+            while ((Amax_found is False) and (i<20)):
+                outAm=ccode.interfacess(fullpars,np.array([Amax]))
+                if np.abs(np.log2(outAm/outinf30))<tol_A:
+                    Amax_found=True
+                else:
+                    Amax=Amax*10
+                    i+=1
+            if not Amax_found:
+                #print("failed to get Amax", outinf30, outAm)
+                score=[np.NaN,np.NaN]
+    if len(score)==0 or plot:
+        if not n:
+            log10Amin=np.log10(Amin)
+            log10Amax=np.log10(Amax)
+            orders_m=log10Amax-log10Amin
+            n=int(n_per_om*np.ceil(orders_m))
+        Avals=np.logspace(log10Amin,log10Amax,n)
+    
+        #print(len(Avals))
+        out=np.zeros(len(Avals))
+        for a in range(n):
+            A=Avals[a]
+            out[a]=ccode.interfacess(fullpars,np.array([A]))
+        if not log2out:
+            f=out/out0
+        else:
+            f=np.log2(out/out0)
+        if len(score)==0:
+            score=scoref(f,kwargs)
+    
     if plot:
-        plt.plot(np.log10(Avals),out/out0)
+        plt.plot(np.log10(Avals),f)
         plt.show()
     if returnout:
-        return [score,out/out0]
+        return [score,f,Amin,Amax,n]
     else:
         return score
