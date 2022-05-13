@@ -165,8 +165,9 @@ def get_score_up_down(out):
     delta_y=(x2-x1)/x1 #if decreasing at x1: negative quantity. If increasing at x1: positive.
     return [delta_x,delta_y]
 
-def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.070389327891398):
+def get_score_up_down_v2(out,parset=[],tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.070389327891398,printmultipeak=False,plotmultipeak=False):
     """out is assumed to be the response, in log2(FC).
+    parset is the list of parameters that has produced this result. This is handy if I want to print the parameters associated to a given behaviour.
     tol is the tolerance to decide if at any given point, the function is increasing, decreasing or flat. 
     out0_tol is used to discard functions if they start with a value greater than out0_tol. This is only applied if check_out0 is set to True.
     fc_tol is set to 0.07039 which is log2(1.05/1). If the difference between maximum and minimum of out is less than this, it is essentially flat, so discard."""
@@ -203,15 +204,18 @@ def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.07
         yc=out[argmin]
     else:
         multi_peak=True
-        print(multi_peak)
-        print(",".join(map(str,out)))
-        #mins=argrelmin(out)
-        #maxs=argrelmax(out)
-        #plt.plot(range(len(out)),out)
-        #plt.scatter(mins,out[mins],color="b")
-        #plt.scatter(maxs,out[maxs],color="r")
-        #plt.title("%s,%s"%(0,y1))
-        #plt.show()
+        if printmultipeak:
+            print(multi_peak)
+            print(",".join(map(str,out)))
+            print(",".join(map(str,parset)))
+        if plotmultipeak:
+            plt.show()
+            plt.plot(range(len(out)),out)
+            plt.show()
+            #plt.scatter(mins,out[mins],color="b")
+            #plt.scatter(maxs,out[maxs],color="r")
+            #plt.title("%s,%s"%(0,y1))
+        #
         yc=0
         
         
@@ -290,7 +294,7 @@ def score(pars,return_fullpars=None,ssfunc=None,scoref=None,n=20,Amin=0,Amax=0,p
         else:
             f=np.log2(out/out0)
         if len(score)==0:
-            score=scoref(f,**kwargs)
+            score=scoref(f,parset=fullpars,**kwargs)
     
     if plot:
         plt.plot(np.log10(Avals),f)
