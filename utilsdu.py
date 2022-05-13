@@ -221,7 +221,6 @@ def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.07
 
 def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False,log2out=False,n_per_om=4,**kwargs):
     """kwargs are arguments to be passed to the actual scoring function scoref. It must have a fc_tol parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
-    print(kwargs)
     tol_A=kwargs["out0_tol"]#to decide Amax and Amin
     fullpars=return_fullpars(pars,model,transitions)
     out0=ccode.interfacess(fullpars,np.array([0])) #basal expression, in the absence of TF
