@@ -165,6 +165,8 @@ def get_score_up_down(out):
 
 def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.070389327891398):
     """out is assumed to be the response, in log2(FC).
+    tol is the tolerance to decide if at any given point, the function is increasing, decreasing or flat. 
+    out0_tol is used to discard functions if they start with a value greater than out0_tol. This is only applied if check_out0 is set to True.
     fc_tol is set to 0.07039 which is log2(1.05/1). If the difference between maximum and minimum of out is less than this, it is essentially flat, so discard."""
     if check_out0 and out[0]>out0_tol:
         #print(out[0],"evaluate a smaller TF concentration") 
@@ -218,8 +220,9 @@ def get_score_up_down_v2(out,tol=1e-5,check_out0=True,out0_tol=0.001,fc_tol=0.07
     return [delta_x,delta_y]
 
 def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Amax=0,plot=False,returnout=False,log2out=False,n_per_om=4,**kwargs):
-    """kwargs are arguments to be passed to the actual scoring function scoref. It must have a tol_A parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
-    tol_A=kwargs["tol_A"]
+    """kwargs are arguments to be passed to the actual scoring function scoref. It must have a fc_tol parameter to pick Amin and Amax in this function, and other parameters as needed for scoref."""
+    print(kwargs)
+    tol_A=kwargs["out0_tol"]#to decide Amax and Amin
     fullpars=return_fullpars(pars,model,transitions)
     out0=ccode.interfacess(fullpars,np.array([0])) #basal expression, in the absence of TF
     score=[]
@@ -279,7 +282,7 @@ def score(pars,model=None,transitions=None,ccode=None,scoref=None,n=20,Amin=0,Am
         else:
             f=np.log2(out/out0)
         if len(score)==0:
-            score=scoref(f,kwargs)
+            score=scoref(f,**kwargs)
     
     if plot:
         plt.plot(np.log10(Avals),f)
